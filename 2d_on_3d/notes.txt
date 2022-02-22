@@ -1,0 +1,8 @@
+- how to get "see through" sphere? eg, see inside of 
+  the opposite side of the sphere when the camera side
+  has alpha of 0
+    - https://docs.derivative.ca/Back-Face_Culling
+    - https://forum.derivative.ca/t/fixed-alpha-premultiplication-issues/178001
+    - (solution) - turn on blending - https://docs.derivative.ca/Constant_MAT#Blending
+- How to accesss and place cameras in geometry view
+- how to create path/spline sops for more detailed camera control
