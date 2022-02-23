@@ -6,3 +6,7 @@
     - (solution) - turn on blending - https://docs.derivative.ca/Constant_MAT#Blending
 - How to accesss and place cameras in geometry view
 - how to create path/spline sops for more detailed camera control
+
+
+
+- why is fps so low for concentric sphere? Is depth-test/alpha stuff very expensive?
