@@ -1,0 +1,1 @@
+For lights, under "Light" option panel, polygon back faces need to be back-lit to prevent weird color flash
