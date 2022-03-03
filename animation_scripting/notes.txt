@@ -8,3 +8,16 @@
 
 2. (alt) - can just merge osc_vals_map and script_dat tables? should always have id
    cols in same order? Just need to give -1 id to osc_dat when empty 
+
+
+
+next challenge: how to have different OSC messages trigger different animation "tracks"?
+  - simple answer - just different chains completely, feeding into a diff geo?
+    - should be able to wrap them in a comp if needed for easy portability
+  - complicated answer if you need to feed into a single geo 
+    -  have same set of parameters (necessary for feeding into uniforms), but diff lookup chops, etc
+    - potentially - just a have different chains per OSC message, and at the end of the chain,
+      use a select CHOP to rename the chain-specific param names into param[1-n], and 
+      then somehow use chops to mix the final batch
+    - need to figure out how to properly toggle rendering? maybe filter out id == -1 column in the
+      script dats before they are re-converted to chops 
