@@ -1,0 +1,7 @@
+- on OSC event, OSC dat triggers event, gets return-val id from event trigger,
+  and adds (id, ...oscVals) row/col to a osc_vals_map table
+- script dat pulls vals from osc_vals_map table
+- handler callbacks for event chop remove id, ...oscVals) row/col when event is destroyed
+- if there's an order of execution problem, can use expression-chop/script-chop 
+  on event-id channel to keep track of IDs and add to osc_vals_map BEFORE triggering
+  the event, because event-ids increase by 1
