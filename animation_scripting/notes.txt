@@ -1,7 +1,10 @@
-- on OSC event, OSC dat triggers event, gets return-val id from event trigger,
+1. on OSC event, OSC dat triggers event, gets return-val id from event trigger,
   and adds (id, ...oscVals) row/col to a osc_vals_map table
-- script dat pulls vals from osc_vals_map table
-- handler callbacks for event chop remove id, ...oscVals) row/col when event is destroyed
-- if there's an order of execution problem, can use expression-chop/script-chop 
+2. script dat pulls vals from osc_vals_map table
+3. handler callbacks for event chop remove id, ...oscVals) row/col when event is destroyed
+4. if there's an order of execution problem, can use expression-chop/script-chop 
   on event-id channel to keep track of IDs and add to osc_vals_map BEFORE triggering
   the event, because event-ids increase by 1
+
+2. (alt) - can just merge osc_vals_map and script_dat tables? should always have id
+   cols in same order? Just need to give -1 id to osc_dat when empty 
