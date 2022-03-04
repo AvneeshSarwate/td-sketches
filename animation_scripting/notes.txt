@@ -11,6 +11,8 @@
 
 
 
+
+
 next challenge: how to have different OSC messages trigger different animation "tracks"?
   - simple answer - just different chains completely, feeding into a diff geo?
     - should be able to wrap them in a comp if needed for easy portability
