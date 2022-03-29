@@ -10,7 +10,7 @@ websocket.onopen = e => console.log("ws open", e);
 websocket.onerror = e => console.log("ws error", e);
 
 const slidersContainer = document.getElementById('slidersContainer');
-let sliderList = [];
+let controlList = [];
 
 /**
  * @param {String} html 
@@ -36,14 +36,19 @@ function sendSliderMessage(addr, val) {
  */
 function createSlider(sliderName) {
     const sliderTemplate = `
-    <span id=${sliderName}Container><input id=${sliderName} type="range" min="0" max="1" step="0.001"> <label>${sliderName}<label> </span> 
+    <div>
+        <span id=${sliderName}Container>
+            <input class="slider" id=${sliderName} type="range" min="0" max="1" step="0.001"> <label>${sliderName}<label> 
+        </span>
+        <br><br>
+    </div> 
     `
 
     const singleContainer = htmlToElement(sliderTemplate);
     slidersContainer.append(singleContainer);
     const slider = document.getElementById(sliderName);
-    slider.onchange = function(val) {
-        sendSliderMessage(sliderName, val)
+    slider.oninput = function(val) {
+        sendSliderMessage(sliderName, val.currentTarget.value)
     }
 }
 
@@ -65,9 +70,22 @@ function arrayEq(arr1, arr2) {
 
 websocket.onmessage= e => {
     console.log("ws message", e);
-    const newSliders = JSON.parse(e.data);
-    if(arrayEq(newSliders, sliderList)) {
+    const newControls = JSON.parse(e.data);
+    const sliders = [];
+    newControls.forEach(slider_spec => {
+        if(slider_spec[1] == "sliderCOMP") {
+            if(slider_spec[2] == "u" || slider_spec[2] == "v") {
+                sliders.push(slider_spec[0])
+            } else if(slider_spec[2] == "uv") {
+                sliders.push(slider_spec[0] + "_" + "u");
+                sliders.push(slider_spec[0] + "_" + "v");
+            }
+
+        }
+    } )
+    if(!arrayEq(newControls, controlList)) {
         slidersContainer.innerHTML = "";
-        newSliders.forEach(name => createSlider(name));
+        sliders.forEach(name => createSlider(name));
+        controlList = newControls;
     }
 };
