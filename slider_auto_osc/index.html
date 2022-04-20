@@ -11,12 +11,31 @@
         .slider {
             width: 100%;
         }
+        #slidersContainer {
+            display: flex;
+            flex-direction: row;
+        }
+        #analogFeedback {
+            overflow: scroll;
+        }
+        #sources {
+            overflow: scroll;
+        }
     </style>
 </head>
 
 <body>
 
-    <div id="slidersContainer"></div>
+    <div id="slidersContainer">
+        <!-- create layout for modules - fdbk synth on left, scrollable blocks of sources on right -->
+        <div id="analogFeedback"></div>
+        <div id="sources">
+            <div id="sine_colors"></div>
+            <div id="text_warp"></div>
+            <div id="img_warp"></div>
+        </div>
+
+    </div>
     <!-- <div id="websocket_port">WEBSOCKET_PORT</div> -->
     <script type="module" src="index.module.js"></script>
 </body>
