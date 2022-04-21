@@ -27,14 +27,14 @@ function htmlToElement(html) {
  * @param {String} addr 
  * @param {String} val 
  */
-function sendControlMessage(addr, val, parent, type) {
-    websocket.send(JSON.stringify({addr, val, parent, type}));
+function sendControlMessage(addr, val, parent, type, path) {
+    websocket.send(JSON.stringify({addr, val, parent, type, path}));
 }
 
 /**
  * @param {String} sliderName 
  */
-function createSlider(sliderName, containerName) {
+function createSlider(sliderName, containerName, path) {
     const htmlId = sliderName + '_' + containerName;
     const sliderTemplate = `
     <div>
@@ -49,27 +49,27 @@ function createSlider(sliderName, containerName) {
     document.getElementById(containerName).append(singleContainer);
     const slider = document.getElementById(htmlId);
     slider.oninput = function(val) {
-        sendControlMessage(sliderName, val.currentTarget.value, containerName, 'slider');
+        sendControlMessage(sliderName, val.currentTarget.value, containerName, 'slider', path);
     }
 }
 
-function createButton(buttonName, containerName) {
+function createButton(buttonName, containerName, path) {
     const htmlId = buttonName + '_' + containerName;
     const buttonTemplate = `
-    <div>
-        <span id=${htmlId}Container>
-            <input class="button" id=${htmlId} type="button" min="0" max="1" step="0.001"> <label>${buttonName}<label> 
-        </span>
-        <br><br>
-    </div> 
+    <span>
+        <div id=${htmlId}Container class="buttonAndLabel">
+            <input class="button" id=${htmlId} type="button" min="0" max="1" step="0.001"> 
+            <div>${buttonName}<div> 
+        </div>
+    </span> 
     `
 
     const singleContainer = htmlToElement(buttonTemplate);
     document.getElementById(containerName).firstChild.append(singleContainer); //Buttons have a sub-container
     const button = document.getElementById(htmlId);
-    button.oninput = function(val) {
-        sendControlMessage(buttonName, val.currentTarget.value, containerName, 'button');
-    }
+    button.onmousedown = val => sendControlMessage(buttonName, 1, containerName, 'button', path);
+    button.onmouseup = val => sendControlMessage(buttonName, 0, containerName, 'button', path);
+
 }
 
 
@@ -91,11 +91,11 @@ function arrayEq(arr1, arr2) {
 function splitSlidersByModule(slider_spec) {
     const sliders_by_module = {};
     slider_spec.forEach(spec => {
-        const module_name = spec[3].split("/")[2];
+        const module_name = spec[3].split("/").at(-2);
         if(!sliders_by_module[module_name]) {
             sliders_by_module[module_name] = [];
         }
-        sliders_by_module[module_name].push(module_name);
+        sliders_by_module[module_name].push(spec);
     });
     return sliders_by_module;
 }
@@ -103,38 +103,38 @@ function splitSlidersByModule(slider_spec) {
 websocket.onmessage= e => {
     console.log("ws message", e);
     const newControls = JSON.parse(e.data);
-    const sliders = [];
-    newControls.forEach(slider_spec => {
-        if(slider_spec[1] == "sliderCOMP") {
-            if(slider_spec[2] == "u" || slider_spec[2] == "v") {
-                sliders.push(slider_spec[0])
-            } else if(slider_spec[2] == "uv") {
-                sliders.push(slider_spec[0] + "_" + "u");
-                sliders.push(slider_spec[0] + "_" + "v");
-            }
-        }
-    } )
+    // const sliders = [];
+    // newControls.forEach(slider_spec => {
+    //     if(slider_spec[1] == "sliderCOMP") {
+    //         if(slider_spec[2] == "u" || slider_spec[2] == "v") {
+    //             sliders.push(slider_spec[0])
+    //         } else if(slider_spec[2] == "uv") {
+    //             sliders.push(slider_spec[0] + "_" + "u");
+    //             sliders.push(slider_spec[0] + "_" + "v");
+    //         }
+    //     }
+    // } )
     if(!arrayEq(newControls, controlList)) {
         // slidersContainer.innerHTML = "";
         // sliders.forEach(name => createSlider(name));
-        // controlList = newControls;
-        const slidersByModule = splitSlidersByModule(slider_spec);
+        controlList = newControls;
+        const slidersByModule = splitSlidersByModule(newControls);
         Object.keys(slidersByModule).forEach(mod_name => {
             const mod_container = document.getElementById(mod_name);
-            mod_container.innerHTML = '<div class="buttons"></div>';
+            mod_container.innerHTML = '<span class="buttons"></span><br>';
 
             //split buttons and put them in a horizontal row at top of source module
             slidersByModule[mod_name].filter(conf => conf[1] == "buttonCOMP").forEach(conf => {
-                createButton(conf[0], mod_name);
+                createButton(conf[0], mod_name, conf[3]);
             });
 
             //make/splid sliders and add them under buttons
-            slidersByModule[mod_name].filter(conf => conf[1] == "buttonCOMP").forEach(conf => {
-                if(confg[2] == "u" || confg[2] == "v") {
-                    createSlider(confg[0], mod_name);
-                } else if(confg[2] == "uv") {
-                    createSlider(confg[0] + "_" + "u", mod_name);
-                    createSlider(confg[0] + "_" + "v", mod_name);
+            slidersByModule[mod_name].filter(conf => conf[1] == "sliderCOMP").forEach(conf => {
+                if(conf[2] == "u" || conf[2] == "v") {
+                    createSlider(conf[0], mod_name, conf[3]);
+                } else if(conf[2] == "uv") {
+                    createSlider(conf[0] + "_" + "u", mod_name, conf[3]);
+                    createSlider(conf[0] + "_" + "v", mod_name, conf[3]);
                 }
             });
         })

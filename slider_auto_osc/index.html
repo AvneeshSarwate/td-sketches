@@ -11,28 +11,49 @@
         .slider {
             width: 100%;
         }
+        .buttons {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+        }
+        .button {
+            width: 50px;
+            height: 50px;
+        }
+        .section{
+            margin: 5px;
+            padding: 5px;
+        }
+        .buttonAndLabel {
+            flex-direction: column;
+            align-items: center;
+        }
         #slidersContainer {
             display: flex;
             flex-direction: row;
+            width: 100%;
         }
         #analogFeedback {
             overflow: scroll;
+            width: 100%;
         }
         #sources {
             overflow: scroll;
+            width: 100%;
         }
     </style>
 </head>
 
 <body>
 
+    <div id="project1" class="section"></div>
     <div id="slidersContainer">
         <!-- create layout for modules - fdbk synth on left, scrollable blocks of sources on right -->
         <div id="analogFeedback"></div>
         <div id="sources">
-            <div id="sine_colors"></div>
-            <div id="text_warp"></div>
-            <div id="img_warp"></div>
+            <div id="sine_colors" class="section"></div>
+            <div id="text_warp" class="section"></div>
+            <div id="img_warp" class="section"></div>
         </div>
 
     </div>
