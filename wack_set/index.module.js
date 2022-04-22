@@ -103,7 +103,7 @@ function splitSlidersByModule(slider_spec) {
 
 websocket.onmessage= e => {
     console.log("ws message", e);
-    const newControls = JSON.parse(e.data);
+    const json_data = JSON.parse(e.data);
     // const sliders = [];
     // newControls.forEach(slider_spec => {
     //     if(slider_spec[1] == "sliderCOMP") {
@@ -115,31 +115,44 @@ websocket.onmessage= e => {
     //         }
     //     }
     // } )
-    if(!arrayEq(newControls, controlList)) {
-        // slidersContainer.innerHTML = "";
-        // sliders.forEach(name => createSlider(name));
-        controlList = newControls;
-        const slidersByModule = splitSlidersByModule(newControls);
-        Object.keys(slidersByModule).forEach(mod_name => {
-            const mod_container = document.getElementById(mod_name);
-            mod_container.innerHTML = `
-            <div class="header">${mod_name}</div>
-            <div class="buttons"></div><br>`;
-
-            //split buttons and put them in a horizontal row at top of source module
-            slidersByModule[mod_name].filter(conf => conf[1] == "buttonCOMP").forEach(conf => {
-                createButton(conf[0], mod_name, conf[3]);
-            });
-
-            //make/splid sliders and add them under buttons
-            slidersByModule[mod_name].filter(conf => conf[1] == "sliderCOMP").forEach(conf => {
-                if(conf[2] == "u" || conf[2] == "v") {
-                    createSlider(conf[0], mod_name, conf[3]);
-                } else if(conf[2] == "uv") {
-                    createSlider(conf[0] + "_" + "u", mod_name, conf[3]);
-                    createSlider(conf[0] + "_" + "v", mod_name, conf[3]);
-                }
-            });
+    const currentParams = json_data['current_parameters']
+    if(currentParams) {
+        Object.keys(currentParams).forEach(key => {
+            const mod_name = key.split("/")[0];
+            const param_name = key.split("/")[1];
+            const param_val = currentParams[key];
+            const slider = document.querySelector(`#${param_name}_${mod_name}Container input`);
+            slider.value = param_val;
         })
+    } else {
+        const newControls = json_data;
+        if(!arrayEq(newControls, controlList)) {
+            // slidersContainer.innerHTML = "";
+            // sliders.forEach(name => createSlider(name));
+            controlList = newControls;
+            const slidersByModule = splitSlidersByModule(newControls);
+            Object.keys(slidersByModule).forEach(mod_name => {
+                const mod_container = document.getElementById(mod_name);
+                mod_container.innerHTML = `
+                <div class="header">${mod_name}</div>
+                <div class="buttons"></div><br>`;
+    
+                //split buttons and put them in a horizontal row at top of source module
+                slidersByModule[mod_name].filter(conf => conf[1] == "buttonCOMP").forEach(conf => {
+                    createButton(conf[0], mod_name, conf[3]);
+                });
+    
+                //make/splid sliders and add them under buttons
+                slidersByModule[mod_name].filter(conf => conf[1] == "sliderCOMP").forEach(conf => {
+                    if(conf[2] == "u" || conf[2] == "v") {
+                        createSlider(conf[0], mod_name, conf[3]);
+                    } else if(conf[2] == "uv") {
+                        createSlider(conf[0] + "_" + "u", mod_name, conf[3]);
+                        createSlider(conf[0] + "_" + "v", mod_name, conf[3]);
+                    }
+                });
+            })
+        }
     }
+   
 };
