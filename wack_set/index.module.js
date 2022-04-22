@@ -65,7 +65,8 @@ function createButton(buttonName, containerName, path) {
     `
 
     const singleContainer = htmlToElement(buttonTemplate);
-    document.getElementById(containerName).firstChild.append(singleContainer); //Buttons have a sub-container
+    const buttonContainer = document.querySelector(`#${containerName} .buttons`);
+    buttonContainer.append(singleContainer); //Buttons have a sub-container
     const button = document.getElementById(htmlId);
     button.onmousedown = val => sendControlMessage(buttonName, 1, containerName, 'button', path);
     button.onmouseup = val => sendControlMessage(buttonName, 0, containerName, 'button', path);
@@ -121,7 +122,9 @@ websocket.onmessage= e => {
         const slidersByModule = splitSlidersByModule(newControls);
         Object.keys(slidersByModule).forEach(mod_name => {
             const mod_container = document.getElementById(mod_name);
-            mod_container.innerHTML = '<span class="buttons"></span><br>';
+            mod_container.innerHTML = `
+            <div class="header">${mod_name}</div>
+            <div class="buttons"></div><br>`;
 
             //split buttons and put them in a horizontal row at top of source module
             slidersByModule[mod_name].filter(conf => conf[1] == "buttonCOMP").forEach(conf => {
