@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta name="description" content="Webpage description goes here" />
+  <meta charset="utf-8">
+  <title>Change_me</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="">
+</head>
+
+<body>
+  
+<div id="container">
+  
+</div>
+
+<script>
+    var window_binding_vals = Object.keys(window).filter(e => e.includes("td") || e.includes("touch") || e.includes("stop")).join("\n");
+    document.getElementById("container").innerHTML = Object.keys(window).length;
+</script>
+
+</body>
+</html>
