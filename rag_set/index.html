@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta name="description" content="Webpage description goes here" />
+    <meta charset="utf-8">
+    <title>Change_me</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="">
+    <style>
+        .slider {
+            width: 100%;
+        }
+        .buttons {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+        }
+        .button {
+            width: 50px;
+            height: 50px;
+        }
+        .section{
+            margin: 5px;
+            padding: 5px;
+        }
+        .buttonAndLabel {
+            flex-direction: column;
+            align-items: center;
+        }
+        #slidersContainer {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 1000px; /*TODO: this is only a hack for scrollability*/
+        }
+        #analogFeedback {
+            overflow: scroll;
+            width: 100%;
+            height: 100%;
+        }
+        #sources {
+            overflow: scroll;
+            width: 100%;
+            height: 100%;
+        }
+        .header {
+            font-size: 24px;
+            padding: 5px;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="project1" class="section"></div>
+    <div id="param_manager" class="section"></div>
+    <div id="slidersContainer">
+        <!-- create layout for modules - fdbk synth on left, scrollable blocks of sources on right -->
+        <div id="analogFeedback"></div>
+        <div id="sources">
+            <div id="sine_colors" class="section"></div>
+            <div id="text_warp" class="section"></div>
+            <div id="img_warp" class="section"></div>
+        </div>
+
+    </div>
+    <!-- <div id="websocket_port">WEBSOCKET_PORT</div> -->
+    <script type="module" src="index.module.js"></script>
+</body>
+</html>
