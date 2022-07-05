@@ -9,6 +9,8 @@
   
   <textarea id="textInput" style="width: 90%; height: 400px;"></textarea>
   <br>
+  <button style="width: 200px; height: 100px;" id="clear_button">CLEAR</button>
+  <br>
   <!-- <input id="camZoom" type="range" min="5" max="100" value="5" step="0.1" style="width: 90%;"> -->
   
 </body>
@@ -24,11 +26,18 @@
         websocket.send(JSON.stringify({msg:"text", data: textarea.value}));
     }
 
-    const camZoom = document.getElementById("camZoom");
-    camZoom.value = 5;
-    camZoom.oninput = (evt) => {
-        // console.log(evt);
-        websocket.send(JSON.stringify({msg:"zoom", data: camZoom.value}));
+    // const camZoom = document.getElementById("camZoom");
+    // camZoom.value = 5;
+    // camZoom.oninput = (evt) => {
+    //     // console.log(evt);
+    //     websocket.send(JSON.stringify({msg:"zoom", data: camZoom.value}));
+    // }
+
+    const clear_button = document.getElementById("clear_button");
+    clear_button.onclick = (evt) => {
+        console.log(evt)
+        textarea.value = "";
+        websocket.send(JSON.stringify({msg:"text", data: textarea.value}));
     }
 
     websocket.onopen = () => {
