@@ -9,6 +9,10 @@
   
   <textarea id="textInput" style="width: 90%; height: 400px;"></textarea>
   <br>
+  <button style="width: 200px; height: 100px;" id="clear_button">CLEAR</button>
+  <button style="width: 200px; height: 100px;" id="transcript_button">DOWNLOAD TRANSCRIPT</button>
+  <br>
+  <div id="transcript_section"></div>
   <!-- <input id="camZoom" type="range" min="5" max="100" value="5" step="0.1" style="width: 90%;"> -->
   
 </body>
@@ -16,25 +20,69 @@
 <script>
 
     const websocket = new WebSocket(window.location.href.replace("http", "ws"));
+    const session_id = Date.now();
 
     const textarea = document.getElementById("textInput");
+    const transcript_section = document.getElementById('transcript_section')
+
+    let transcription_lines = [];
     textarea.value = "";
     textarea.oninput = (evt) => {
         // console.log(evt);
         websocket.send(JSON.stringify({msg:"text", data: textarea.value}));
     }
 
-    const camZoom = document.getElementById("camZoom");
-    camZoom.value = 5;
-    camZoom.oninput = (evt) => {
-        // console.log(evt);
-        websocket.send(JSON.stringify({msg:"zoom", data: camZoom.value}));
+    // const camZoom = document.getElementById("camZoom");
+    // camZoom.value = 5;
+    // camZoom.oninput = (evt) => {
+    //     // console.log(evt);
+    //     websocket.send(JSON.stringify({msg:"zoom", data: camZoom.value}));
+    // }
+
+    const clear_button = document.getElementById("clear_button");
+    clear_button.onclick = (evt) => {
+        transcription_lines.push(textarea.value);
+        transcript_section.innerText = transcription_lines.join("\n");
+        console.log(evt)
+        textarea.value = "";
+        websocket.send(JSON.stringify({msg:"text", data: textarea.value}));
+    }
+
+    const transcript_button = document.getElementById("transcript_button");
+    transcript_button.onclick = (evt) => {
+        let transcript_str = transcription_lines.join("\n") + "\n" + textarea.value;
+        downloadTranscript(transcript_str);
+    }
+
+    window.onbeforeunload = () => {
+        return "Do you want to close before saving the transcript?"
     }
 
     websocket.onopen = () => {
         websocket.send(JSON.stringify({msg:"text", data: ""}));
         websocket.send(JSON.stringify({msg:"zoom", data: 5}));
     }
+
+    function downloadTranscript(text) {
+        var element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', "transcript.txt");
+
+        element.style.display = 'none';
+        document.body.appendChild(element);
+
+        element.click();
+
+        document.body.removeChild(element);
+    }
+
+    function backupTranscriptToTD() {
+        let lim = " LINESPLIT "
+        let transcript_str = transcription_lines.join(lim).replace('\n', lim) + lim + textarea.value;
+        websocket.send(JSON.stringify({msg:"backup", transcript_str, session_id}));
+    }
+
+    setInterval(backupTranscriptToTD, 1000);
 
 </script>
 </html>
