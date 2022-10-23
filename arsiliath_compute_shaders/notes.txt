@@ -1,0 +1,1 @@
+find parameters that result in some movement, but then quickly stabilize - then drive all motion with triggers/masks/displacement
