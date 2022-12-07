@@ -9,7 +9,7 @@ wss.on('connection', function connection(ws) {
         const ptsArray = JSON.parse(data.toString());
         const pts = ptsArray[0].map((e, i, arr) => ({ x: ptsArray[0][i], y: ptsArray[1][i] }));
         if (diagram) voronoi.recycle(diagram);
-        diagram = voronoi.compute(pts, { xl: -1, xr: 1, yt: -1, yb: 1 })
+        diagram = voronoi.compute(pts, { xl: 0, xr: 1, yt: 0, yb: 1 })
         // const polys = diagram.cells.map(c => {
         //     return c.halfedges.map(h => {
         //         const sp = h.getStartpoint();
