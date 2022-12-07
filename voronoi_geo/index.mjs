@@ -26,6 +26,10 @@ wss.on('connection', function connection(ws) {
             });
             return [x, y];
         });
+        //todo remap the cells into the order of the input points
+        /* Important - cell order does not reflect input site order - the the voronoiID, 
+       which the voronoi library adds onto the site objects,
+       maps the site => its corresponding cell */
         ws.send(JSON.stringify(polys));
     });
 
