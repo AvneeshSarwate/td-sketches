@@ -27,10 +27,11 @@ wss.on('connection', function connection(ws) {
             return [x, y];
         });
         //todo remap the cells into the order of the input points
-        /* Important - cell order does not reflect input site order - the the voronoiID, 
+        /* Important - cell order does not reflect input site order - the the voronoiID,
        which the voronoi library adds onto the site objects,
        maps the site => its corresponding cell */
-        ws.send(JSON.stringify(polys));
+        const sorted_polys = pts.map(pt => polys[pt.voronoiId]);
+        ws.send(JSON.stringify(sorted_polys));
     });
 
     ws.send('something');
