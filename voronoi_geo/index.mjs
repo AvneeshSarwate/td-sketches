@@ -16,6 +16,7 @@ wss.on('connection', function connection(ws) {
         //         return { x: sp.x, y: sp.y };
         //     });
         // });
+        let maxLen = 0;
         const polys = diagram.cells.map(c => {
             let x = [];
             let y = []
@@ -24,6 +25,7 @@ wss.on('connection', function connection(ws) {
                 x.push(sp.x);
                 y.push(sp.y);
             });
+            maxLen = Math.max(maxLen, x.length);
             return [x, y];
         });
         //todo remap the cells into the order of the input points
@@ -31,7 +33,28 @@ wss.on('connection', function connection(ws) {
        which the voronoi library adds onto the site objects,
        maps the site => its corresponding cell */
         const sorted_polys = pts.map(pt => polys[pt.voronoiId]);
-        ws.send(JSON.stringify(sorted_polys));
+
+        //pad the lengths of each subarray with the last element so they are all the same length
+        sorted_polys.forEach(poly => {
+            const lastX = poly[0][poly[0].length - 1];
+            const lastY = poly[1][poly[0].length - 1];
+            while (poly[0].length < maxLen) {
+                poly[0].push(lastX);
+                poly[1].push(lastY);
+            }
+        });
+
+        //convert polys into [polyNum][polyPointNum][x,y]
+        var reorderd_polys = [];
+        sorted_polys.forEach(poly => {
+            const per_pt_poly = [];
+            for (let i = 0; i < maxLen; i++) {
+                per_pt_poly.push([poly[0][i], poly[1][i]]);
+            }
+            reorderd_polys.push(per_pt_poly);
+        });
+
+        ws.send(JSON.stringify(reorderd_polys));
     });
 
     ws.send('something');
