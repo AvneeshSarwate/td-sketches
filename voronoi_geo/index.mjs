@@ -36,6 +36,7 @@ wss.on('connection', function connection(ws) {
 
         //pad the lengths of each subarray with the last element so they are all the same length
         sorted_polys.forEach(poly => {
+            //TODO - see if array is empty here and handle it
             const lastX = poly[0][poly[0].length - 1];
             const lastY = poly[1][poly[0].length - 1];
             while (poly[0].length < maxLen) {
