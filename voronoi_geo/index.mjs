@@ -45,7 +45,7 @@ wss.on('connection', function connection(ws) {
         });
 
         //convert polys into [polyNum][polyPointNum][x,y]
-        var reorderd_polys = [];
+        let reorderd_polys = [];
         sorted_polys.forEach(poly => {
             const per_pt_poly = [];
             for (let i = 0; i < maxLen; i++) {
@@ -53,8 +53,11 @@ wss.on('connection', function connection(ws) {
             }
             reorderd_polys.push(per_pt_poly);
         });
+        // ws.send(JSON.stringify(reorderd_polys));
 
-        ws.send(JSON.stringify(reorderd_polys));
+        //flatten reorderd_polys and convert to a Float32Array
+        reorderd_polys = new Float32Array(reorderd_polys.flat(2));
+        ws.send(reorderd_polys.buffer);
     });
 
     ws.send('something');
