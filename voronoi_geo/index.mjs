@@ -5,7 +5,10 @@ const wss = new WebSocketServer({ port: 8080 });
 const voronoi = new Voronoi();
 let diagram = null;
 wss.on('connection', function connection(ws) {
+    let frameIndex = 0;
+    let frameTimeBuffer = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     ws.on('message', function message(data) {
+        const frameTime = performance.now();
         const ptsArray = JSON.parse(data.toString());
         const pts = ptsArray[0].map((e, i, arr) => ({ x: ptsArray[0][i], y: ptsArray[1][i] }));
         if (diagram) voronoi.recycle(diagram);
@@ -28,7 +31,7 @@ wss.on('connection', function connection(ws) {
             maxLen = Math.max(maxLen, x.length);
             return [x, y];
         });
-        //todo remap the cells into the order of the input points
+
         /* Important - cell order does not reflect input site order - the the voronoiID,
        which the voronoi library adds onto the site objects,
        maps the site => its corresponding cell */
@@ -59,6 +62,12 @@ wss.on('connection', function connection(ws) {
         //flatten reorderd_polys and convert to a Float32Array
         reorderd_polys = new Float32Array(reorderd_polys.flat(2));
         ws.send(reorderd_polys.buffer);
+        let frameEndTime = performance.now();
+        let frameDiff = frameEndTime - frameTime;
+        frameTimeBuffer[frameIndex % frameTimeBuffer.length] = frameDiff;
+        if (frameIndex % frameTimeBuffer.length == 0) {
+            // console.log(frameTimeBuffer.reduce((a, b) => a + b, 0) / frameTimeBuffer.length);
+        }
     });
 
     ws.send('something');
