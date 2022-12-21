@@ -14,3 +14,6 @@ f = OSCFunc.new({|msg, time, addr, recvPort|
 
 
 ~arr.do({|i| i.postln})
+
+~arr[0] = 0.005
+~arr.sum[1] / ~arr.size
