@@ -1,0 +1,15 @@
+TouchDesigner GLSL Compute Particles Tutorial [XVh_eHL_7XU].webm
+SOPs and Shading (English _ 日本語) [f-9dumsikrQ].webm
+GLSL in TouchDesigner - Vincent Houzé [EDtf0hN66CY].webm
+Feedback Techniques (English _ 日本語) [r-XwzEzYhUU].webm
+rudimental flock in Touchdesigner [ayfnhRyv34Y].webm
+Abstract 3D Sculpture – TouchDesigner Tutorial 43 [heNlC53o40s].webm
+recursive displace in Touchdesigner [V-h9rNVokqU].webm
+displace TOP in Touchdesigner [xi1fQ2NMRvk].webm
+sculpting with height maps in Touchdesigner [_mmisxQamAM].webm
+custom emitter in Touchdesigner [9--XuYe7rDY].webm
+geometry with TOPs in Touchdesigner [5DRlPjdirHg].webm
+collision detection in Touchdesigner [w47xTWMNTFA].webm
+Texture Instancing for Mac – TouchDesigner Tips, Tricks and FAQs 14 [YZ8SbCdjo2o].webm
+TouchDesigner Tips _03 Compute Shader [25cS5nidHkM].webm
+2D Collision Detection – TouchDesigner Tips, Tricks and FAQs 11 [n81NAf0Orus].webm
