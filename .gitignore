@@ -3,4 +3,4 @@ drive_view*
 *.mov
 *.mp4
 *.DS_Store
-mili_kinetic_set/media_pipe_toxes/MediaPipe.tox
+*MediaPipe.tox
