@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "dbScope": "repo",
+  "dbRepoId": "github.com/AvneeshSarwate/td-sketches",
+  "meta": {
+    "createdAt": "2026-10-31T14:42:15.159Z",
+    "toolVersion": "0.1.0"
+  },
+  "flows": {}
+}
