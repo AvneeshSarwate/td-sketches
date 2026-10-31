@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 22,
+  "version": 34,
   "platform": "macos-arm64",
-  "sha256": "88c46ee6107e0655e5b09e261bf4bb4f38de546a97da1195c619a927dde8e854"
+  "sha256": "f6137b9cdd05e22556baf0541a1ddcd97568046264d2d57ffd93dbbcf85e699e"
 }
