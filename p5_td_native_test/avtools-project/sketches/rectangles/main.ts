@@ -11,6 +11,7 @@ export const parameters = {
   Righttoleft: { type: 'toggle', default: false, label: 'Right to Left' },
   Speed: { type: 'float', default: 240, min: 10, max: 1000, clamp: true }, // pixels per second
   Counterclockwise: { type: 'toggle', default: false },
+  Launch: { type: 'toggle', default: true }, // when off, scheduled launches are skipped
 } as const satisfies ParameterDefinitions;
 
 // Motion and rotation are pure functions of wall-clock time, evaluated once per
@@ -79,7 +80,7 @@ export const setup: Setup<typeof parameters> = (p, host) => {
 
   const task = launch(async (ctx) => {
     while (true) {
-      launchRectangle(ctx);
+      if (host.params.Launch) launchRectangle(ctx);
       await ctx.waitSec(1 / host.params.Launchfrequency);
     }
   });
