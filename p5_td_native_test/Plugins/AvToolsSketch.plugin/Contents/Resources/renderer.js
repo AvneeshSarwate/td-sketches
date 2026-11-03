@@ -1288,12 +1288,162 @@
     return messages;
   }
 
-  // src/td-io.ts
+  // src/td-websocket.ts
   var g2 = globalThis;
   var sequence2 = 0;
+  var events2 = /* @__PURE__ */ new Map();
+  g2.__avWebSocketEvent = (id, kind, text, bytes, code) => {
+    events2.get(id)?.(kind, text, bytes, code);
+  };
+  var native2 = (op, id = 0, socket = 0, text = "", code = 0, bytes) => g2.__avWebSocket(op, id, socket, text, code, bytes);
+  function createWebSocketHost(life) {
+    const disposers = /* @__PURE__ */ new Set();
+    life.onDispose(() => {
+      for (const dispose of [...disposers]) dispose();
+      disposers.clear();
+    });
+    return Object.freeze({
+      connect(url) {
+        return life.run(() => {
+          if (typeof url !== "string" || !/^wss?:\/\/[^\s]+$/.test(url) || url.includes("\0")) {
+            throw new TypeError("Expected a ws:// or wss:// URL");
+          }
+          if (disposers.size >= 16) throw new Error("WebSocket connection limit (16)");
+          const id = ++sequence2;
+          let readyState = "connecting";
+          const opens = /* @__PURE__ */ new Set();
+          const messages = /* @__PURE__ */ new Set();
+          const errors = /* @__PURE__ */ new Set();
+          const closes = /* @__PURE__ */ new Set();
+          const sends = /* @__PURE__ */ new Map();
+          let bufferedAmount = 0;
+          function listen(set, callback) {
+            return life.run(() => {
+              if (typeof callback !== "function") throw new TypeError("Expected a callback");
+              if (readyState === "closed") throw new Error("WebSocket is closed");
+              set.add(callback);
+              return () => {
+                set.delete(callback);
+              };
+            });
+          }
+          function cleanup() {
+            readyState = "closed";
+            events2.delete(id);
+            disposers.delete(dispose);
+            for (const [request, finish] of sends) {
+              events2.delete(request);
+              finish(new Error("WebSocket closed before send completed"));
+            }
+            sends.clear();
+            opens.clear();
+            messages.clear();
+            errors.clear();
+            closes.clear();
+          }
+          function dispose() {
+            try {
+              native2("close", 0, id, "", 1e3);
+            } catch {
+            }
+            cleanup();
+          }
+          events2.set(id, (kind, text, bytes, code) => {
+            if (readyState === "closed") return;
+            if (kind === "open") {
+              if (readyState !== "connecting") return;
+              readyState = "open";
+              for (const callback of [...opens]) life.run(callback);
+            } else if (kind === "text" || kind === "binary") {
+              if (readyState !== "open") return;
+              const data = kind === "text" ? utf8Decode(bytes) : bytes;
+              for (const callback of [...messages]) life.run(() => callback(data));
+            } else if (kind === "error") {
+              if (!errors.size) console.warn("WebSocket:", text);
+              for (const callback of [...errors]) life.run(() => callback(new Error(text)));
+            } else if (kind === "close") {
+              const callbacks = [...closes];
+              cleanup();
+              for (const callback of callbacks) life.run(() => callback(Object.freeze({ code, reason: text })));
+            }
+          });
+          disposers.add(dispose);
+          try {
+            native2("open", id, 0, url);
+          } catch (error) {
+            cleanup();
+            throw error;
+          }
+          return Object.freeze({
+            url,
+            get readyState() {
+              return readyState;
+            },
+            get bufferedAmount() {
+              return bufferedAmount;
+            },
+            onOpen: (callback) => listen(opens, callback),
+            onMessage: (callback) => listen(messages, callback),
+            onError: (callback) => listen(errors, callback),
+            onClose: (callback) => listen(closes, callback),
+            send(data) {
+              return life.run(() => new Promise((resolve, reject) => {
+                if (readyState !== "open") {
+                  reject(new Error("WebSocket is not open"));
+                  return;
+                }
+                const text = typeof data === "string";
+                if (!text && !(data instanceof Uint8Array)) {
+                  reject(new TypeError("Expected string or Uint8Array"));
+                  return;
+                }
+                if (data.length > 8 * 1024 * 1024) {
+                  reject(new Error("WebSocket message exceeds 8 MiB"));
+                  return;
+                }
+                const bytes = text ? utf8Encode(data) : data;
+                if (bytes.length > 8 * 1024 * 1024 || sends.size >= 64 || bufferedAmount + bytes.length > 16 * 1024 * 1024) {
+                  reject(new Error("WebSocket send limit (8 MiB/message, 64 pending / 16 MiB)"));
+                  return;
+                }
+                const request = ++sequence2;
+                bufferedAmount += bytes.length;
+                const finish = (error) => {
+                  bufferedAmount -= bytes.length;
+                  sends.delete(request);
+                  events2.delete(request);
+                  if (error) reject(error);
+                  else resolve();
+                };
+                sends.set(request, finish);
+                events2.set(request, (_kind, error) => finish(error ? new Error(error) : void 0));
+                try {
+                  native2("send", request, id, "", text ? 1 : 0, bytes);
+                } catch (error) {
+                  finish(error);
+                }
+              }));
+            },
+            close(code = 1e3, reason = "") {
+              life.run(() => {
+                if (readyState === "closing" || readyState === "closed") return;
+                if (!Number.isInteger(code) || code !== 1e3 && (code < 3e3 || code > 4999) || typeof reason !== "string" || utf8Encode(reason).length > 123) throw new Error("Invalid WebSocket close code/reason");
+                native2("close", 0, id, reason, code);
+                readyState = "closing";
+              });
+            }
+          });
+        });
+      }
+    });
+  }
+
+  // src/td-io.ts
+  var g3 = globalThis;
+  var sequence3 = 0;
   var pending = /* @__PURE__ */ new Map();
   var receivers2 = /* @__PURE__ */ new Map();
-  g2.__avIOEvent = (id, kind, error, bytes, address2, port) => {
+  g3.__avIOEvent = (id, kind, error, bytes, address2, port) => {
     const remote = Object.freeze({ address: address2, port });
     if (kind === "data" || kind === "socketError") receivers2.get(id)?.(kind, error, bytes, remote);
     else {
@@ -1302,14 +1452,14 @@
       callback?.(kind, error, bytes, remote);
     }
   };
-  var native2 = (op, id = 0, socket = 0, path = "", port = 0, bytes) => g2.__avIO(op, id, socket, path, port, bytes);
+  var native3 = (op, id = 0, socket = 0, path = "", port = 0, bytes) => g3.__avIO(op, id, socket, path, port, bytes);
   function address(options = {}) {
     const address2 = options.address ?? "127.0.0.1", port = options.port ?? 0;
     if (typeof address2 !== "string" || address2.includes("\0") || !Number.isInteger(port) || port < 0 || port > 65535) throw Error("Invalid UDP address/port");
     return { address: address2, port };
   }
   function createIO(life) {
-    const baseDirectory = String(g2.__avBaseDirectory ?? "");
+    const baseDirectory = String(g3.__avBaseDirectory ?? "");
     const ids = /* @__PURE__ */ new Set();
     const sockets = /* @__PURE__ */ new Set();
     life.onDispose(() => {
@@ -1323,7 +1473,7 @@
           reject(Error("Too many pending I/O requests (128)"));
           return;
         }
-        const id = ++sequence2;
+        const id = ++sequence3;
         ids.add(id);
         pending.set(id, (kind, error, data, remote) => {
           ids.delete(id);
@@ -1338,7 +1488,7 @@
           }
         });
         try {
-          native2(op, id, socket, path, port, bytes);
+          native3(op, id, socket, path, port, bytes);
         } catch (error) {
           pending.delete(id);
           ids.delete(id);
@@ -1394,7 +1544,7 @@
             errors.clear();
             sockets.delete(socket);
             try {
-              native2("close", 0, id);
+              native3("close", 0, id);
             } catch {
             }
           }
@@ -1459,9 +1609,10 @@
       });
     }
     return Object.freeze({
+      webSocket: createWebSocketHost(life),
       files: Object.freeze({ baseDirectory, readBytes, readText: async (path) => utf8Decode(await readBytes(path)) }),
       udp: Object.freeze({ open, get droppedDatagrams() {
-        return life.run(() => native2("stats"));
+        return life.run(() => native3("stats"));
       } }),
       osc: Object.freeze({ open: openOsc })
     });
@@ -4399,15 +4550,15 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
         const h = clamp(c1 / maxes[0]);
         const s = clamp(c2 / maxes[1]);
         const b = clamp(c3 / maxes[2]);
-        const [r, g5, bb] = hsbToRgb(h, s, b);
-        return [r, g5, bb, alpha];
+        const [r, g6, bb] = hsbToRgb(h, s, b);
+        return [r, g6, bb, alpha];
       }
       if (this._state.colorMode === this.HSL) {
         const h = clamp(c1 / maxes[0]);
         const s = clamp(c2 / maxes[1]);
         const l = clamp(c3 / maxes[2]);
-        const [r, g5, bb] = hslToRgb(h, s, l);
-        return [r, g5, bb, alpha];
+        const [r, g6, bb] = hslToRgb(h, s, l);
+        return [r, g6, bb, alpha];
       }
       return [
         clamp(c1 / maxes[0]),
@@ -4429,36 +4580,36 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
       if (named.has(input)) return named.get(input);
       if (/^#[0-9a-f]{3}$/.test(input)) {
         const r = parseInt(input[1] + input[1], 16);
-        const g5 = parseInt(input[2] + input[2], 16);
+        const g6 = parseInt(input[2] + input[2], 16);
         const b = parseInt(input[3] + input[3], 16);
-        return [r / 255, g5 / 255, b / 255, 1];
+        return [r / 255, g6 / 255, b / 255, 1];
       }
       if (/^#[0-9a-f]{4}$/.test(input)) {
         const r = parseInt(input[1] + input[1], 16);
-        const g5 = parseInt(input[2] + input[2], 16);
+        const g6 = parseInt(input[2] + input[2], 16);
         const b = parseInt(input[3] + input[3], 16);
         const a = parseInt(input[4] + input[4], 16);
-        return [r / 255, g5 / 255, b / 255, a / 255];
+        return [r / 255, g6 / 255, b / 255, a / 255];
       }
       if (/^#[0-9a-f]{6}$/.test(input)) {
         const r = parseInt(input.slice(1, 3), 16);
-        const g5 = parseInt(input.slice(3, 5), 16);
+        const g6 = parseInt(input.slice(3, 5), 16);
         const b = parseInt(input.slice(5, 7), 16);
-        return [r / 255, g5 / 255, b / 255, 1];
+        return [r / 255, g6 / 255, b / 255, 1];
       }
       if (/^#[0-9a-f]{8}$/.test(input)) {
         const r = parseInt(input.slice(1, 3), 16);
-        const g5 = parseInt(input.slice(3, 5), 16);
+        const g6 = parseInt(input.slice(3, 5), 16);
         const b = parseInt(input.slice(5, 7), 16);
         const a = parseInt(input.slice(7, 9), 16);
-        return [r / 255, g5 / 255, b / 255, a / 255];
+        return [r / 255, g6 / 255, b / 255, a / 255];
       }
       const rgbMatch = input.match(/^rgba?\((.+)\)$/);
       if (rgbMatch) {
         const parts = rgbMatch[1].split(",").map((p2) => p2.trim());
         if (parts.length === 3 || parts.length === 4) {
           const r = parseRgbLikeComponent(parts[0]);
-          const g5 = parseRgbLikeComponent(parts[1]);
+          const g6 = parseRgbLikeComponent(parts[1]);
           const b = parseRgbLikeComponent(parts[2]);
           let a = 255;
           if (parts.length === 4) {
@@ -4470,7 +4621,7 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
               a = alpha <= 1 ? clamp(alpha) * 255 : clamp(alpha, 0, 255);
             }
           }
-          return [clamp(r / 255), clamp(g5 / 255), clamp(b / 255), clamp(a / 255)];
+          return [clamp(r / 255), clamp(g6 / 255), clamp(b / 255), clamp(a / 255)];
         }
       }
       return null;
@@ -5094,26 +5245,26 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     _pushTriangleVertices(ax, ay, bx, by, cx, cy, color) {
       this._ensureGeomStagingCapacity(GEOM_FLOATS_PER_VERTEX * 3);
       const buf = this._geomStagingBuffer;
-      const r = color[0], g5 = color[1], b = color[2], a = color[3];
+      const r = color[0], g6 = color[1], b = color[2], a = color[3];
       let c = this._geomStagingCursor;
       buf[c] = ax;
       buf[c + 1] = ay;
       buf[c + 2] = r;
-      buf[c + 3] = g5;
+      buf[c + 3] = g6;
       buf[c + 4] = b;
       buf[c + 5] = a;
       c += 6;
       buf[c] = bx;
       buf[c + 1] = by;
       buf[c + 2] = r;
-      buf[c + 3] = g5;
+      buf[c + 3] = g6;
       buf[c + 4] = b;
       buf[c + 5] = a;
       c += 6;
       buf[c] = cx;
       buf[c + 1] = cy;
       buf[c + 2] = r;
-      buf[c + 3] = g5;
+      buf[c + 3] = g6;
       buf[c + 4] = b;
       buf[c + 5] = a;
       this._geomStagingCursor = c + 6;
@@ -5536,8 +5687,8 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
 
   // src/text-core.ts
   var HostTextEngine = class {
-    constructor(native3) {
-      this.native = native3;
+    constructor(native4) {
+      this.native = native4;
     }
     cache = /* @__PURE__ */ new Map();
     dispose() {
@@ -5775,13 +5926,13 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     return `${parentSeed}::fork:${forkIndex}`;
   }
   var createYieldToMacrotask = (setTimeoutFn) => {
-    const g5 = globalThis;
-    if (typeof g5.setImmediate === "function") {
-      const setImmediateFn = g5.setImmediate;
+    const g6 = globalThis;
+    if (typeof g6.setImmediate === "function") {
+      const setImmediateFn = g6.setImmediate;
       return () => new Promise((res) => setImmediateFn(res));
     }
-    if (typeof g5.MessageChannel === "function") {
-      const mc = new g5.MessageChannel();
+    if (typeof g6.MessageChannel === "function") {
+      const mc = new g6.MessageChannel();
       const q = [];
       mc.port1.onmessage = () => {
         const fn = q.shift();
@@ -5796,13 +5947,13 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     return () => new Promise((res) => setTimeoutFn(res, 0));
   };
   var createScheduleMacrotask = (setTimeoutFn) => {
-    const g5 = globalThis;
-    if (typeof g5.setImmediate === "function") {
-      const setImmediateFn = g5.setImmediate;
+    const g6 = globalThis;
+    if (typeof g6.setImmediate === "function") {
+      const setImmediateFn = g6.setImmediate;
       return (cb) => setImmediateFn(cb);
     }
-    if (typeof g5.MessageChannel === "function") {
-      const mc = new g5.MessageChannel();
+    if (typeof g6.MessageChannel === "function") {
+      const mc = new g6.MessageChannel();
       const q = [];
       mc.port1.onmessage = () => {
         const fn = q.shift();
@@ -6968,10 +7119,10 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
   };
 
   // src/td-timing.ts
-  var g3 = globalThis;
+  var g4 = globalThis;
   var scopes = /* @__PURE__ */ new Map();
   var SketchLifetime = class {
-    id = g3.__hostRegister();
+    id = g4.__hostRegister();
     active = true;
     error = "";
     roots = /* @__PURE__ */ new Set();
@@ -6991,11 +7142,11 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     }
     run(fn) {
       if (!this.active) throw new Error("Sketch generation has been disposed");
-      const previous = g3.__hostGeneration(this.id);
+      const previous = g4.__hostGeneration(this.id);
       try {
         return fn();
       } finally {
-        g3.__hostGeneration(previous);
+        g4.__hostGeneration(previous);
       }
     }
     track(fn) {
@@ -7024,8 +7175,8 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
       if (!this.active || this.error) return;
       this.error = String(error?.stack ?? error);
       this.run(() => this.cancelRoots());
-      g3.__hostInvalidate(this.id);
-      g3.__hostCancelFrames(this.id);
+      g4.__hostInvalidate(this.id);
+      g4.__hostCancelFrames(this.id);
     }
     dispose() {
       if (!this.active) return;
@@ -7051,8 +7202,8 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
         }
       }
       this.resources.clear();
-      g3.__hostInvalidate(this.id);
-      g3.__hostCancelFrames(this.id);
+      g4.__hostInvalidate(this.id);
+      g4.__hostCancelFrames(this.id);
       this.active = false;
       scopes.delete(this.id);
     }
@@ -7091,18 +7242,18 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
       return wrap(value);
     }
   };
-  g3.__hostError = (error, generation) => {
+  g4.__hostError = (error, generation) => {
     const scope = scopes.get(generation);
     if (scope) scope.fail(error);
     else if (generation === 0) {
-      g3.__avError = String(error?.stack ?? error);
-      g3.__avBackgroundError = g3.__avError;
+      g4.__avError = String(error?.stack ?? error);
+      g4.__avBackgroundError = g4.__avError;
     }
   };
 
   // src/td-runtime.ts
-  var g4 = globalThis;
-  Object.assign(g4, nativeGPU.globals);
+  var g5 = globalThis;
+  Object.assign(g5, nativeGPU.globals);
   var fonts = JSON.parse(__avFontsJSON);
   var device;
   var p;
@@ -7118,13 +7269,13 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
   var params = parameterSnapshot({});
   var controlsMeta = { sampleRate: 0, startIndex: 0 };
   var message = (error) => String(error?.stack ?? error);
-  g4.__avDone = false;
-  g4.__avError = "";
-  g4.__avBytes = null;
-  g4.__avPulseNames = "[]";
-  g4.__avSyphonClients = 0;
-  g4.__avSyphonPublished = 0;
-  g4.__avSyphonDropped = 0;
+  g5.__avDone = false;
+  g5.__avError = "";
+  g5.__avBytes = null;
+  g5.__avPulseNames = "[]";
+  g5.__avSyphonClients = 0;
+  g5.__avSyphonPublished = 0;
+  g5.__avSyphonDropped = 0;
   var syphon;
   var syphonName = "";
   var lifetime;
@@ -7137,25 +7288,25 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     if (!adapter) throw new Error("No Metal adapter");
     device = await adapter.requestDevice();
     device.addEventListener("uncapturederror", (event) => {
-      g4.__avError = event.error.message;
+      g5.__avError = event.error.message;
       blocked = true;
     });
     device.lost.then((info) => {
       blocked = true;
-      g4.__avError = `Device lost: ${info.message}; reset the operator`;
+      g5.__avError = `Device lost: ${info.message}; reset the operator`;
     });
   })().catch((error) => {
-    g4.__avError = message(error);
+    g5.__avError = message(error);
   }).finally(() => {
-    g4.__avDone = true;
+    g5.__avDone = true;
   });
-  g4.__avInputs = () => {
+  g5.__avInputs = () => {
     incomingChannels = [];
   };
-  g4.__avChannel = (name) => {
+  g5.__avChannel = (name) => {
     incomingChannels.push({ name, samples: new Float32Array(__avData.buffer, __avData.byteOffset, __avData.byteLength / 4) });
   };
-  g4.__avImage = (index, w, h) => {
+  g5.__avImage = (index, w, h) => {
     let image = images[index];
     if (!image || image.texture.width !== w || image.texture.height !== h) {
       image?.texture.destroy();
@@ -7164,20 +7315,20 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
     }
     device.queue.writeTexture({ texture: image.texture }, __avData, { bytesPerRow: w * 4 }, [w, h]);
   };
-  g4.__avTrimImages = (count) => {
+  g5.__avTrimImages = (count) => {
     channels = incomingChannels;
     const f = JSON.parse(__avFrameJSON);
     params = parameterSnapshot(f.params);
     controlsMeta = { sampleRate: f.sampleRate, startIndex: f.startIndex };
     for (const image of images.splice(count)) image.texture.destroy();
   };
-  g4.__avRender = async () => {
-    g4.__avDone = false;
-    g4.__avError = "";
-    g4.__avHasFrame = false;
-    g4.__avRendered = false;
-    g4.__avDrawMs = 0;
-    g4.__avReadbackMs = 0;
+  g5.__avRender = async () => {
+    g5.__avDone = false;
+    g5.__avError = "";
+    g5.__avHasFrame = false;
+    g5.__avRendered = false;
+    g5.__avDrawMs = 0;
+    g5.__avReadbackMs = 0;
     const frame = JSON.parse(__avFrameJSON);
     frame.params = params;
     try {
@@ -7192,20 +7343,20 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
         const life = lifetime;
         const host = Object.freeze({ ...createIO(life), midi: createMIDI(life), get params() {
           return params;
-        }, device: life.guard(device), readFile: (path) => life.run(() => g4.readFile(path)), timing: life.timing, onDispose: (callback) => life.onDispose(callback), chop, latestControls });
+        }, device: life.guard(device), readFile: (path) => life.run(() => g5.readFile(path)), timing: life.timing, onDispose: (callback) => life.onDispose(callback), chop, latestControls });
         await life.run(() => sketch.setup?.(sketchP, host));
         if (life.error) throw new Error(life.error);
         width = frame.width;
         height = frame.height;
         stride = Math.ceil(width * 4 / 256) * 256;
         staging = device.createBuffer({ size: stride * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        g4.__avPulseNames = JSON.stringify(sketch.onPulse && typeof sketch.onPulse === "object" ? Object.keys(sketch.onPulse).filter((name) => typeof sketch.onPulse[name] === "function") : []);
+        g5.__avPulseNames = JSON.stringify(sketch.onPulse && typeof sketch.onPulse === "object" ? Object.keys(sketch.onPulse).filter((name) => typeof sketch.onPulse[name] === "function") : []);
       }
       if (!p || !sketch) throw new Error("No valid sketch");
       if (lifetime?.error) throw new Error(lifetime.error);
-      if (g4.__avBackgroundError) throw new Error(g4.__avBackgroundError);
+      if (g5.__avBackgroundError) throw new Error(g5.__avBackgroundError);
       if (blocked) throw new Error("Draw stopped after an error; edit the source or reset");
-      await g4.__hostFrame();
+      await g5.__hostFrame();
       frame.time = (frame.frame - 1) / frame.rate;
       frame.controls = Object.freeze({ sampleRate: frame.sampleRate, startIndex: frame.startIndex, channels });
       frame.chop = chop;
@@ -7217,7 +7368,7 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
         if (syphonName) syphon = new nativeGPU.NativeSyphon(device, syphonName, false);
       }
       if (frame.syphonOnly && !syphon) throw new Error("Syphon-only output requires an enabled, named Syphon channel");
-      const drawStart = g4.hostNow();
+      const drawStart = g5.hostNow();
       p.beginFrame();
       try {
         for (const name of JSON.parse(__avPulsesJSON)) {
@@ -7242,47 +7393,47 @@ fn fsText(v: VertexOut) -> @location(0) vec4f {
       const texture = p.endFrame();
       syphon?.publish(texture, true, { x: 0, y: 0, width, height });
       const syphonStats = syphon?.stats();
-      g4.__avSyphonClients = Number(syphonStats?.hasClients ?? false);
-      g4.__avSyphonPublished = syphonStats?.published ?? 0;
-      g4.__avSyphonDropped = syphonStats?.dropped ?? 0;
-      g4.__avRendered = true;
+      g5.__avSyphonClients = Number(syphonStats?.hasClients ?? false);
+      g5.__avSyphonPublished = syphonStats?.published ?? 0;
+      g5.__avSyphonDropped = syphonStats?.dropped ?? 0;
+      g5.__avRendered = true;
       if (frame.syphonOnly) {
-        g4.__avDrawMs = g4.hostNow() - drawStart;
-        g4.__avError = "";
+        g5.__avDrawMs = g5.hostNow() - drawStart;
+        g5.__avError = "";
         return;
       }
       const encoder = device.createCommandEncoder();
       encoder.copyTextureToBuffer({ texture }, { buffer: staging, bytesPerRow: stride }, [width, height]);
       device.queue.submit([encoder.finish()]);
-      g4.__avSubmitted = true;
-      g4.__avDrawMs = g4.hostNow() - drawStart;
-      const readbackStart = g4.hostNow();
+      g5.__avSubmitted = true;
+      g5.__avDrawMs = g5.hostNow() - drawStart;
+      const readbackStart = g5.hostNow();
       await staging.mapAsync(GPUMapMode.READ);
-      g4.__avReadbackMs = g4.hostNow() - readbackStart;
-      g4.__avBytes = new Uint8Array(staging.getMappedRange());
-      g4.__avHasFrame = true;
-      g4.__avError = "";
+      g5.__avReadbackMs = g5.hostNow() - readbackStart;
+      g5.__avBytes = new Uint8Array(staging.getMappedRange());
+      g5.__avHasFrame = true;
+      g5.__avError = "";
     } catch (error) {
       lifetime?.fail(error);
-      g4.__avError = message(error);
+      g5.__avError = message(error);
     } finally {
-      g4.__avDone = true;
+      g5.__avDone = true;
     }
   };
-  g4.__avUnmap = () => {
-    g4.__avBytes = null;
+  g5.__avUnmap = () => {
+    g5.__avBytes = null;
     if (staging?.mapState === "mapped") staging.unmap();
   };
-  g4.__avDispose = () => {
-    g4.__avDone = false;
+  g5.__avDispose = () => {
+    g5.__avDone = false;
     lifetime?.dispose();
-    g4.__avUnmap();
+    g5.__avUnmap();
     syphon?.dispose();
     for (const image of images) image.texture.destroy();
     images = [];
     p?.dispose();
     staging?.destroy();
     device?.destroy();
-    g4.__avDone = true;
+    g5.__avDone = true;
   };
 })();

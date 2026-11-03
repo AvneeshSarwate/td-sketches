@@ -1288,12 +1288,162 @@
     return messages;
   }
 
-  // src/td-io.ts
+  // src/td-websocket.ts
   var g2 = globalThis;
   var sequence2 = 0;
+  var events2 = /* @__PURE__ */ new Map();
+  g2.__avWebSocketEvent = (id, kind, text, bytes, code) => {
+    events2.get(id)?.(kind, text, bytes, code);
+  };
+  var native2 = (op, id = 0, socket = 0, text = "", code = 0, bytes) => g2.__avWebSocket(op, id, socket, text, code, bytes);
+  function createWebSocketHost(life) {
+    const disposers = /* @__PURE__ */ new Set();
+    life.onDispose(() => {
+      for (const dispose of [...disposers]) dispose();
+      disposers.clear();
+    });
+    return Object.freeze({
+      connect(url) {
+        return life.run(() => {
+          if (typeof url !== "string" || !/^wss?:\/\/[^\s]+$/.test(url) || url.includes("\0")) {
+            throw new TypeError("Expected a ws:// or wss:// URL");
+          }
+          if (disposers.size >= 16) throw new Error("WebSocket connection limit (16)");
+          const id = ++sequence2;
+          let readyState = "connecting";
+          const opens = /* @__PURE__ */ new Set();
+          const messages = /* @__PURE__ */ new Set();
+          const errors = /* @__PURE__ */ new Set();
+          const closes = /* @__PURE__ */ new Set();
+          const sends = /* @__PURE__ */ new Map();
+          let bufferedAmount = 0;
+          function listen(set, callback) {
+            return life.run(() => {
+              if (typeof callback !== "function") throw new TypeError("Expected a callback");
+              if (readyState === "closed") throw new Error("WebSocket is closed");
+              set.add(callback);
+              return () => {
+                set.delete(callback);
+              };
+            });
+          }
+          function cleanup() {
+            readyState = "closed";
+            events2.delete(id);
+            disposers.delete(dispose);
+            for (const [request, finish] of sends) {
+              events2.delete(request);
+              finish(new Error("WebSocket closed before send completed"));
+            }
+            sends.clear();
+            opens.clear();
+            messages.clear();
+            errors.clear();
+            closes.clear();
+          }
+          function dispose() {
+            try {
+              native2("close", 0, id, "", 1e3);
+            } catch {
+            }
+            cleanup();
+          }
+          events2.set(id, (kind, text, bytes, code) => {
+            if (readyState === "closed") return;
+            if (kind === "open") {
+              if (readyState !== "connecting") return;
+              readyState = "open";
+              for (const callback of [...opens]) life.run(callback);
+            } else if (kind === "text" || kind === "binary") {
+              if (readyState !== "open") return;
+              const data = kind === "text" ? utf8Decode(bytes) : bytes;
+              for (const callback of [...messages]) life.run(() => callback(data));
+            } else if (kind === "error") {
+              if (!errors.size) console.warn("WebSocket:", text);
+              for (const callback of [...errors]) life.run(() => callback(new Error(text)));
+            } else if (kind === "close") {
+              const callbacks = [...closes];
+              cleanup();
+              for (const callback of callbacks) life.run(() => callback(Object.freeze({ code, reason: text })));
+            }
+          });
+          disposers.add(dispose);
+          try {
+            native2("open", id, 0, url);
+          } catch (error) {
+            cleanup();
+            throw error;
+          }
+          return Object.freeze({
+            url,
+            get readyState() {
+              return readyState;
+            },
+            get bufferedAmount() {
+              return bufferedAmount;
+            },
+            onOpen: (callback) => listen(opens, callback),
+            onMessage: (callback) => listen(messages, callback),
+            onError: (callback) => listen(errors, callback),
+            onClose: (callback) => listen(closes, callback),
+            send(data) {
+              return life.run(() => new Promise((resolve, reject) => {
+                if (readyState !== "open") {
+                  reject(new Error("WebSocket is not open"));
+                  return;
+                }
+                const text = typeof data === "string";
+                if (!text && !(data instanceof Uint8Array)) {
+                  reject(new TypeError("Expected string or Uint8Array"));
+                  return;
+                }
+                if (data.length > 8 * 1024 * 1024) {
+                  reject(new Error("WebSocket message exceeds 8 MiB"));
+                  return;
+                }
+                const bytes = text ? utf8Encode(data) : data;
+                if (bytes.length > 8 * 1024 * 1024 || sends.size >= 64 || bufferedAmount + bytes.length > 16 * 1024 * 1024) {
+                  reject(new Error("WebSocket send limit (8 MiB/message, 64 pending / 16 MiB)"));
+                  return;
+                }
+                const request = ++sequence2;
+                bufferedAmount += bytes.length;
+                const finish = (error) => {
+                  bufferedAmount -= bytes.length;
+                  sends.delete(request);
+                  events2.delete(request);
+                  if (error) reject(error);
+                  else resolve();
+                };
+                sends.set(request, finish);
+                events2.set(request, (_kind, error) => finish(error ? new Error(error) : void 0));
+                try {
+                  native2("send", request, id, "", text ? 1 : 0, bytes);
+                } catch (error) {
+                  finish(error);
+                }
+              }));
+            },
+            close(code = 1e3, reason = "") {
+              life.run(() => {
+                if (readyState === "closing" || readyState === "closed") return;
+                if (!Number.isInteger(code) || code !== 1e3 && (code < 3e3 || code > 4999) || typeof reason !== "string" || utf8Encode(reason).length > 123) throw new Error("Invalid WebSocket close code/reason");
+                native2("close", 0, id, reason, code);
+                readyState = "closing";
+              });
+            }
+          });
+        });
+      }
+    });
+  }
+
+  // src/td-io.ts
+  var g3 = globalThis;
+  var sequence3 = 0;
   var pending = /* @__PURE__ */ new Map();
   var receivers2 = /* @__PURE__ */ new Map();
-  g2.__avIOEvent = (id, kind, error, bytes, address2, port) => {
+  g3.__avIOEvent = (id, kind, error, bytes, address2, port) => {
     const remote = Object.freeze({ address: address2, port });
     if (kind === "data" || kind === "socketError") receivers2.get(id)?.(kind, error, bytes, remote);
     else {
@@ -1302,14 +1452,14 @@
       callback?.(kind, error, bytes, remote);
     }
   };
-  var native2 = (op, id = 0, socket = 0, path = "", port = 0, bytes) => g2.__avIO(op, id, socket, path, port, bytes);
+  var native3 = (op, id = 0, socket = 0, path = "", port = 0, bytes) => g3.__avIO(op, id, socket, path, port, bytes);
   function address(options = {}) {
     const address2 = options.address ?? "127.0.0.1", port = options.port ?? 0;
     if (typeof address2 !== "string" || address2.includes("\0") || !Number.isInteger(port) || port < 0 || port > 65535) throw Error("Invalid UDP address/port");
     return { address: address2, port };
   }
   function createIO(life) {
-    const baseDirectory = String(g2.__avBaseDirectory ?? "");
+    const baseDirectory = String(g3.__avBaseDirectory ?? "");
     const ids = /* @__PURE__ */ new Set();
     const sockets = /* @__PURE__ */ new Set();
     life.onDispose(() => {
@@ -1323,7 +1473,7 @@
           reject(Error("Too many pending I/O requests (128)"));
           return;
         }
-        const id = ++sequence2;
+        const id = ++sequence3;
         ids.add(id);
         pending.set(id, (kind, error, data, remote) => {
           ids.delete(id);
@@ -1338,7 +1488,7 @@
           }
         });
         try {
-          native2(op, id, socket, path, port, bytes);
+          native3(op, id, socket, path, port, bytes);
         } catch (error) {
           pending.delete(id);
           ids.delete(id);
@@ -1394,7 +1544,7 @@
             errors.clear();
             sockets.delete(socket);
             try {
-              native2("close", 0, id);
+              native3("close", 0, id);
             } catch {
             }
           }
@@ -1459,9 +1609,10 @@
       });
     }
     return Object.freeze({
+      webSocket: createWebSocketHost(life),
       files: Object.freeze({ baseDirectory, readBytes, readText: async (path) => utf8Decode(await readBytes(path)) }),
       udp: Object.freeze({ open, get droppedDatagrams() {
-        return life.run(() => native2("stats"));
+        return life.run(() => native3("stats"));
       } }),
       osc: Object.freeze({ open: openOsc })
     });
@@ -1643,13 +1794,13 @@
     return `${parentSeed}::fork:${forkIndex}`;
   }
   var createYieldToMacrotask = (setTimeoutFn) => {
-    const g5 = globalThis;
-    if (typeof g5.setImmediate === "function") {
-      const setImmediateFn = g5.setImmediate;
+    const g6 = globalThis;
+    if (typeof g6.setImmediate === "function") {
+      const setImmediateFn = g6.setImmediate;
       return () => new Promise((res) => setImmediateFn(res));
     }
-    if (typeof g5.MessageChannel === "function") {
-      const mc = new g5.MessageChannel();
+    if (typeof g6.MessageChannel === "function") {
+      const mc = new g6.MessageChannel();
       const q = [];
       mc.port1.onmessage = () => {
         const fn = q.shift();
@@ -1664,13 +1815,13 @@
     return () => new Promise((res) => setTimeoutFn(res, 0));
   };
   var createScheduleMacrotask = (setTimeoutFn) => {
-    const g5 = globalThis;
-    if (typeof g5.setImmediate === "function") {
-      const setImmediateFn = g5.setImmediate;
+    const g6 = globalThis;
+    if (typeof g6.setImmediate === "function") {
+      const setImmediateFn = g6.setImmediate;
       return (cb) => setImmediateFn(cb);
     }
-    if (typeof g5.MessageChannel === "function") {
-      const mc = new g5.MessageChannel();
+    if (typeof g6.MessageChannel === "function") {
+      const mc = new g6.MessageChannel();
       const q = [];
       mc.port1.onmessage = () => {
         const fn = q.shift();
@@ -2836,10 +2987,10 @@
   };
 
   // src/td-timing.ts
-  var g3 = globalThis;
+  var g4 = globalThis;
   var scopes = /* @__PURE__ */ new Map();
   var SketchLifetime = class {
-    id = g3.__hostRegister();
+    id = g4.__hostRegister();
     active = true;
     error = "";
     roots = /* @__PURE__ */ new Set();
@@ -2859,11 +3010,11 @@
     }
     run(fn) {
       if (!this.active) throw new Error("Sketch generation has been disposed");
-      const previous = g3.__hostGeneration(this.id);
+      const previous = g4.__hostGeneration(this.id);
       try {
         return fn();
       } finally {
-        g3.__hostGeneration(previous);
+        g4.__hostGeneration(previous);
       }
     }
     track(fn) {
@@ -2892,8 +3043,8 @@
       if (!this.active || this.error) return;
       this.error = String(error?.stack ?? error);
       this.run(() => this.cancelRoots());
-      g3.__hostInvalidate(this.id);
-      g3.__hostCancelFrames(this.id);
+      g4.__hostInvalidate(this.id);
+      g4.__hostCancelFrames(this.id);
     }
     dispose() {
       if (!this.active) return;
@@ -2919,8 +3070,8 @@
         }
       }
       this.resources.clear();
-      g3.__hostInvalidate(this.id);
-      g3.__hostCancelFrames(this.id);
+      g4.__hostInvalidate(this.id);
+      g4.__hostCancelFrames(this.id);
       this.active = false;
       scopes.delete(this.id);
     }
@@ -2959,17 +3110,17 @@
       return wrap(value);
     }
   };
-  g3.__hostError = (error, generation) => {
+  g4.__hostError = (error, generation) => {
     const scope = scopes.get(generation);
     if (scope) scope.fail(error);
     else if (generation === 0) {
-      g3.__avError = String(error?.stack ?? error);
-      g3.__avBackgroundError = g3.__avError;
+      g4.__avError = String(error?.stack ?? error);
+      g4.__avBackgroundError = g4.__avError;
     }
   };
 
   // src/td-chop-runtime.ts
-  var g4 = globalThis;
+  var g5 = globalThis;
   var active;
   var inputs = [];
   var frame;
@@ -2986,13 +3137,13 @@
       throw Error(`${name} must be synchronous; use TimeContext for independent tasks`);
     }
   };
-  g4.__avChopDirty = false;
-  g4.__avDone = true;
-  g4.__avError = "";
-  g4.__avHasFrame = false;
-  g4.__avChopAccept = () => {
-    const incoming = JSON.parse(g4.__avFrameJSON);
-    const data = new Float32Array(g4.__avData.buffer, g4.__avData.byteOffset, g4.__avData.byteLength / 4);
+  g5.__avChopDirty = false;
+  g5.__avDone = true;
+  g5.__avError = "";
+  g5.__avHasFrame = false;
+  g5.__avChopAccept = () => {
+    const incoming = JSON.parse(g5.__avFrameJSON);
+    const data = new Float32Array(g5.__avData.buffer, g5.__avData.byteOffset, g5.__avData.byteLength / 4);
     const next = Array.from({ length: 4 }, () => /* @__PURE__ */ new Map());
     for (const c of incoming.channels) next[c.input].set(c.name, data.subarray(c.offset, c.offset + c.count));
     inputs = next;
@@ -3002,7 +3153,7 @@
     sampleCount = incoming.outputSamples;
     params = parameterSnapshot(incoming.params);
     frame = Object.freeze({ frame: incoming.frame, absFrame: incoming.absFrame, rate: incoming.rate, deltaSeconds: incoming.deltaSeconds, time: (incoming.frame - 1) / incoming.rate });
-    g4.__avData = null;
+    g5.__avData = null;
   };
   function createGeneration() {
     const life = new SketchLifetime();
@@ -3040,7 +3191,7 @@
           const next = finite(name, value);
           if (data[sample] !== next) {
             data[sample] = next;
-            g4.__avChopDirty = true;
+            g5.__avChopDirty = true;
           }
         }),
         get: (name, sample = 0) => life.run(() => values.get(name)?.[sample] ?? 0),
@@ -3051,7 +3202,7 @@
           const next = new Float32Array(count);
           for (let i = 0; i < count; i++) next[i] = finite(name, source[i]);
           data.set(next);
-          g4.__avChopDirty = true;
+          g5.__avChopDirty = true;
         }),
         names: () => life.run(() => [...values.keys()])
       }),
@@ -3059,15 +3210,15 @@
     });
     return { signature: JSON.stringify([names, sampleCount]), life, host, values, program: {} };
   }
-  g4.__avChopCook = async () => {
-    g4.__avDone = false;
-    g4.__avError = "";
-    g4.__avHasFrame = false;
+  g5.__avChopCook = async () => {
+    g5.__avDone = false;
+    g5.__avError = "";
+    g5.__avHasFrame = false;
     try {
       const signature = JSON.stringify([names, sampleCount]);
       if (!active) {
         active = createGeneration();
-        active.program = active.life.run(() => new Function(`${g4.__avSource}
+        active.program = active.life.run(() => new Function(`${g5.__avSource}
 ;return {setup:typeof setup==='function'?setup:undefined,onCook:typeof onCook==='function'?onCook:undefined,onPulse:typeof onPulse==='function'?onPulse:undefined};`)());
         if (!active.program.setup && !active.program.onCook) throw Error("CHOP script must define setup(host) or onCook(host, frame)");
         await active.life.run(() => active.program.setup?.(active.host));
@@ -3075,8 +3226,8 @@
       }
       const current = active;
       if (current.life.error) throw Error(current.life.error);
-      if (g4.__avBackgroundError) throw Error(g4.__avBackgroundError);
-      await g4.__hostFrame();
+      if (g5.__avBackgroundError) throw Error(g5.__avBackgroundError);
+      await g5.__hostFrame();
       if (current.life.error) throw Error(current.life.error);
       try {
         for (const name of pulses) synchronous(current.life.run(() => current.program.onPulse?.(name, current.host)), "onPulse");
@@ -3088,9 +3239,9 @@
       }
     } catch (error) {
       active?.life.fail(error);
-      g4.__avError = message(error);
+      g5.__avError = message(error);
     } finally {
-      g4.__avDone = true;
+      g5.__avDone = true;
     }
   };
   function snapshot(current) {
@@ -3099,26 +3250,26 @@
       const data = current.values.get(name);
       if (data) output.set(data.subarray(0, sampleCount), index * sampleCount);
     });
-    g4.__avBytes = new Uint8Array(output.buffer);
-    g4.__avHasFrame = true;
-    g4.__avChopDirty = false;
+    g5.__avBytes = new Uint8Array(output.buffer);
+    g5.__avHasFrame = true;
+    g5.__avChopDirty = false;
   }
-  g4.__avChopFlush = () => {
-    g4.__avHasFrame = false;
-    if (!active || !g4.__avDone || active.signature !== JSON.stringify([names, sampleCount])) return;
-    if (active.life.error || g4.__avBackgroundError) {
-      g4.__avError = active.life.error || g4.__avBackgroundError;
+  g5.__avChopFlush = () => {
+    g5.__avHasFrame = false;
+    if (!active || !g5.__avDone || active.signature !== JSON.stringify([names, sampleCount])) return;
+    if (active.life.error || g5.__avBackgroundError) {
+      g5.__avError = active.life.error || g5.__avBackgroundError;
       return;
     }
-    if (g4.__avChopDirty) snapshot(active);
+    if (g5.__avChopDirty) snapshot(active);
   };
-  g4.__avDispose = () => {
-    g4.__avDone = false;
+  g5.__avDispose = () => {
+    g5.__avDone = false;
     try {
       active?.life.dispose();
       active = void 0;
     } finally {
-      g4.__avDone = true;
+      g5.__avDone = true;
     }
   };
 })();

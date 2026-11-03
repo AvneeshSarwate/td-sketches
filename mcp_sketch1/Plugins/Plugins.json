@@ -1,0 +1,24 @@
+{
+    "Version": 1,
+    "AllowedPlugins": {
+        "21048047": {
+            "ComputerName": "avneeshs-macbook-pro-2021.local",
+            "Plugins": {
+                "/Users/avneeshsarwate/Documents/TouchDesigner/mcp_sketch1/Plugins/AvToolsSketch.plugin": {
+                    "Hashes": [
+                        "za5qbwAD8msIcHWDQFVbl8BiH6df+2SPwWeknI9QIq1+9sK8UEN/r/L+2XTsP8v7RLvSPPbRourxOuJjZsXO5djjuDhsS0S6XEkj5Tp/obdb6If8pFKpIrD15EUlMWFhBeaVRm77nlBTjjkq21Hnrp5fdsrOeIzYAzcq/M6o3u+3LxSYhH/MyRPlA9y5IcivAItTBe+O9pN5NebjarE/tgpm8dqVMEzsLgAd+W7QQv25Rs2mK3o1V2O/fea71lDX0USlC/U42SPT9wOjfVd/h/1d7NqYVZuzaSsqNF8rAW95/hMJohFHvZn7t+fYBhvZMV1F40mECOali4kr/ONWXg=="
+                    ],
+                    "AuthorName": "avTools",
+                    "AuthorEmail": ""
+                },
+                "/Users/avneeshsarwate/Documents/TouchDesigner/mcp_sketch1/Plugins/AvToolsChannels.plugin": {
+                    "Hashes": [
+                        "trHanepnZFwdgnlKuceIbn55dZoXjnMLH7oMjgtVRGWZcO4qq+ObGCMNPdBg+ANSfr+yZl6X7Gu8R/ku3eyzkxuKmyjQntFKQTqxRBmWIITC90yfOcbGPY53xcVgZO52NOKt7GbjnUK8CbPwUHm1FhmIKcJHo5E8jPEmSj7VTVzQ5j62v0SFNmbDKBrsmQomaqvZXVZ4pl2GIlmCWe6lCFP+fiL1Q/HVeFRewzviydBeeV03uyUsrHS0nb1xfeq4+Hp4ixfayyxbxalKQ+DIt6UoAz8FRZUcZtBLUpbjZjEBajGV4CY5qfgrSM7Urj1I/agZ0p2ZTZrL8J6fen7Z0w=="
+                    ],
+                    "AuthorName": "avTools",
+                    "AuthorEmail": ""
+                }
+            }
+        }
+    }
+}
